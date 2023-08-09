@@ -5,113 +5,106 @@ import * as CANNON from 'https://cdn.skypack.dev/cannon-es';
 // BASIC RAW CODE-1
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(0 , 6, 6);
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.shadowMap.enabled = true;
+camera.position.set(10, 15, -22);
+const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 let controls = new OrbitControls(camera, renderer.domElement);
 
-const ambientLight = new THREE.AmbientLight(0x333333);
-scene.add(ambientLight);
+//ground
+const planeMesh = new THREE.Mesh(
+ new THREE.PlaneGeometry(20, 20),
+ new THREE.MeshBasicMaterial({
+  side: THREE.DoubleSide,
+  visible:false 
+ })
+);
+planeMesh.rotateX(-Math.PI/2);
+scene.add(planeMesh);
+planeMesh.name = 'ground';
 
-const directionalLight = new THREE.DirectionalLight(0xFFFFFF, 0.8);
-scene.add(directionalLight);
-directionalLight.position.set(0,50,0);
-directionalLight.castShadow = true;
-directionalLight.shadow.mapSize.width = 1024;
-directionalLight.shadow.mapSize.height  = 1024;
-
-// const helper = new THREE.AxesHelper(20);
-// scene.add(helper);
-
-// CANNON.Body / physics body
-const world = new CANNON.World({gravity: new CANNON.Vec3(0, -9.81, 0)});
+const grid = new THREE.GridHelper(20,20);
+scene.add(grid);
 
 //ground
-const planeGeo = new THREE.PlaneGeometry(10, 10);
-const planeMat = new THREE.MeshStandardMaterial({
-  color: 0xFFFFFF,
-  side: THREE.DoubleSide,
-});
-const planeMesh = new THREE.Mesh(planeGeo, planeMat);
-scene.add(planeMesh);
-planeMesh.receiveShadow = true;
+const highlightMesh = new THREE.Mesh(
+  new THREE.PlaneGeometry(1, 1),
+  new THREE.MeshBasicMaterial({
+   side: THREE.DoubleSide,
+   transparent: true
+  })
+ );
+ highlightMesh.rotateX(-Math.PI/2);
+ highlightMesh.position.set(0.5, 0, 0.5);
+ scene.add(highlightMesh);
 
-//physics in ground
-const planePhyMat = new CANNON.Material();
-const planeBody = new CANNON.Body({
-  type: CANNON.Body.STATIC,
-  shape: new CANNON.Box(new CANNON.Vec3(5, 5, 0.001)),
-  Material: planePhyMat
-});
-planeBody.quaternion.setFromEuler(-Math.PI/2,0,0);
-world.addBody(planeBody);
+ const mousePosition = new THREE.Vector2();
+ const raycaster = new THREE.Raycaster();
+ let intersects;
 
-const mouse = new THREE.Vector2();
-const intersectionPoint = new THREE.Vector3();
-const planeNormal = new THREE.Vector3();
-const plane = new THREE.Plane();
-const raycaster = new THREE.Raycaster();
+ window.addEventListener('mousemove', function(e) {
+  mousePosition.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mousePosition.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mousePosition, camera);
+  intersects = raycaster.intersectObjects(scene.children);
+  intersects.forEach(function(intersect) {
+    if (intersect.object.name === 'ground') {
+      const highlightPos = new THREE.Vector3().copy(intersect.point).floor().addScalar(0.5);
+      highlightMesh.position.set(highlightPos.x, 0, highlightPos.z);
 
-window.addEventListener('mousemove', function(e){
-  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-  planeNormal.copy(camera.position).normalize();
-  plane.setFromNormalAndCoplanarPoint(planeNormal, scene.position);
-  raycaster.setFromCamera(mouse, camera);
-  raycaster.ray.intersectPlane(plane, intersectionPoint);
-});
-
-const meshes = [];
-const bodies = [];
-
-window.addEventListener('click', function(e){
-  const sphereGeo = new THREE.SphereGeometry(0.125, 30, 30);
-  const sphereMat = new THREE.MeshStandardMaterial({ 
-    color:Math.random()*0xFFFFFF,
-    metalness: 0,
-    roughness: 0
+      const objectExist = objects.find(function(object) {
+        return (
+          object.position.x === highlightMesh.position.x &&
+          object.position.z === highlightMesh.position.z
+        );
+      });
+      
+      if (!objectExist) {
+        highlightMesh.material.color.set(0xFFFFFF);
+      } else {
+        highlightMesh.material.color.set(0xFF0000);
+      }
+    }
   });
-  const sphereMesh = new THREE.Mesh(sphereGeo, sphereMat);
-  scene.add(sphereMesh);
-  // sphereMesh.position.copy(intersectionPoint);
-  sphereMesh.castShadow = true;
-  const spherePhysMat = new CANNON.Material();
-  const sphereBody = new CANNON.Body({
-    mass: 0.3,
-    shape: new CANNON.Sphere(0.125),
-    position: new CANNON.Vec3(intersectionPoint.x, intersectionPoint.y, intersectionPoint.z),
-    material: spherePhysMat
-  });
-  world.addBody(sphereBody);
-
-  const planeSphereContactMat = new CANNON.ContactMaterial(
-    planePhyMat,
-    spherePhysMat,
-    {restitution: 0.3}
-  );
-
-  world.addContactMaterial(planeSphereContactMat);
-
-  meshes.push(sphereMesh);
-  bodies.push(sphereBody);
 });
 
-const timeStep = 1 / 60;
+const sphereMesh = new THREE.Mesh(
+  new THREE.SphereGeometry(0.4, 4, 2),
+  new THREE.MeshBasicMaterial({
+    wireframe: true,
+    color: 0xFFEA00
+  })
+);
+const objects = [];
+window.addEventListener('mousedown', function(){
+  const objectExist = objects.find(function(object ){
+    return (object.position.x === highlightMesh.position.x)
+    && (object.position.z === highlightMesh.position.z)
+  });
+
+  if(!objectExist){
+  intersects = raycaster.intersectObjects(scene.children);
+  intersects.forEach(function(intersect) {
+    if (intersect.object.name === 'ground') {
+      const sphereClone = sphereMesh.clone();
+      sphereClone.position.copy(highlightMesh.position);
+      scene.add(sphereClone);
+      objects.push(sphereClone);
+      highlightMesh.material.color.setHex(0xFF0000);
+    }
+  });
+ }
+});
 
 // RENDER
-function animate() {
+function animate(time) {
   requestAnimationFrame(animate);
-  world.step(timeStep);
-
-  planeMesh.position.copy(planeBody.position);
-  planeMesh.quaternion.copy(planeBody.quaternion);
-
-  for(let i = 0; i < meshes.length; i++){
-    meshes[i].position.copy(bodies[i].position);
-    meshes[i].quaternion.copy(bodies[i].quaternion);
-  }
+  highlightMesh.material.opacity = 1 + Math.sin(time/120);
+  objects.forEach(function(object){
+    object.rotation.x = time/1000;
+    object.rotation.z = time/1000;
+    object.position.y = 0.5 + 0.5 * Math.abs(Math.sin(time/1000));
+  });
 
   renderer.render(scene, camera);
 }

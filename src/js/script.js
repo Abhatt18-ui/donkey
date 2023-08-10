@@ -1,111 +1,79 @@
 import * as THREE from "https://cdn.skypack.dev/three@0.136.0";
 import { OrbitControls } from "https://cdn.skypack.dev/three@0.136.0/examples/jsm/controls/OrbitControls.js";
-import * as CANNON from 'https://cdn.skypack.dev/cannon-es';
+import { GLTFLoader } from "https://cdn.skypack.dev/three@0.136.0/examples/jsm/loaders/GLTFLoader.js";
+import { GUI } from "https://cdn.skypack.dev/dat.gui";
+
+const fileUrl = new URL('../assets/Donkey.gltf', import.meta.url);
 
 // BASIC RAW CODE-1
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(10, 15, -22);
-const renderer = new THREE.WebGLRenderer();
+camera.position.set(10, 10, 10);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 let controls = new OrbitControls(camera, renderer.domElement);
 
-//ground
-const planeMesh = new THREE.Mesh(
- new THREE.PlaneGeometry(20, 20),
- new THREE.MeshBasicMaterial({
-  side: THREE.DoubleSide,
-  visible:false 
- })
-);
-planeMesh.rotateX(-Math.PI/2);
-scene.add(planeMesh);
-planeMesh.name = 'ground';
-
-const grid = new THREE.GridHelper(20,20);
+const grid = new THREE.GridHelper(30, 30);
 scene.add(grid);
 
-//ground
-const highlightMesh = new THREE.Mesh(
-  new THREE.PlaneGeometry(1, 1),
-  new THREE.MeshBasicMaterial({
-   side: THREE.DoubleSide,
-   transparent: true
-  })
- );
- highlightMesh.rotateX(-Math.PI/2);
- highlightMesh.position.set(0.5, 0, 0.5);
- scene.add(highlightMesh);
+const ambientLight = new THREE.AmbientLight(0xededed, 0.8);
+scene.add(ambientLight);
 
- const mousePosition = new THREE.Vector2();
- const raycaster = new THREE.Raycaster();
- let intersects;
+const directionalLight = new THREE.DirectionalLight(0xFFFFFF, 1);
+scene.add(directionalLight);
+directionalLight.position.set(10, 11, 7);
 
- window.addEventListener('mousemove', function(e) {
-  mousePosition.x = (e.clientX / window.innerWidth) * 2 - 1;
-  mousePosition.y = -(e.clientY / window.innerHeight) * 2 + 1;
-  raycaster.setFromCamera(mousePosition, camera);
-  intersects = raycaster.intersectObjects(scene.children);
-  intersects.forEach(function(intersect) {
-    if (intersect.object.name === 'ground') {
-      const highlightPos = new THREE.Vector3().copy(intersect.point).floor().addScalar(0.5);
-      highlightMesh.position.set(highlightPos.x, 0, highlightPos.z);
+// CONTROLLERS
+let gui = new GUI();
+let options = {
+  'Main': 0x2F3130,
+  'Main light': 0x7C7C7C,
+  'Main dark': 0x0A0A0A,
+  'Hooves':0x0F0B0D,
+  'Hair':0x0B0804,
+  'Muzzle':0x0B0804,
+  'Eye dark':0x020202,
+  'Eye white': 0xBEBEBE
+};
 
-      const objectExist = objects.find(function(object) {
-        return (
-          object.position.x === highlightMesh.position.x &&
-          object.position.z === highlightMesh.position.z
-        );
-      });
-      
-      if (!objectExist) {
-        highlightMesh.material.color.set(0xFFFFFF);
-      } else {
-        highlightMesh.material.color.set(0xFF0000);
-      }
-    }
-  });
-});
+const gltfLoader = new GLTFLoader();
+gltfLoader.load(fileUrl.href, function (gltf) {
+    const model = gltf.scene;
+    scene.add(model);
+    console.log(model.getObjectByName('Cube_1'));
+    gui.addColor(options, 'Main').onChange(function(e){
+      model.getObjectByName('Cube').material.color.setHex(e);
+    });
+    gui.addColor(options, 'Main light').onChange(function(e){
+      model.getObjectByName('Cube_1').material.color.setHex(e);
+    });
+    gui.addColor(options, 'Main dark').onChange(function(e){
+      model.getObjectByName('Cube_2').material.color.setHex(e);
+    });
+    gui.addColor(options, 'Hooves').onChange(function(e){
+      model.getObjectByName('Cube_3').material.color.setHex(e);
+    });
+    gui.addColor(options, 'Hair').onChange(function(e){
+      model.getObjectByName('Cube_4').material.color.setHex(e);
+    });
+    gui.addColor(options, 'Muzzle').onChange(function(e){
+      model.getObjectByName('Cube_5').material.color.setHex(e);
+    });
+    gui.addColor(options, 'Eye dark').onChange(function(e){
+      model.getObjectByName('Cube_6').material.color.setHex(e);
+    });
+    gui.addColor(options, 'Eye white').onChange(function(e){
+      model.getObjectByName('Cube_7').material.color.setHex(e);
+    });
 
-const sphereMesh = new THREE.Mesh(
-  new THREE.SphereGeometry(0.4, 4, 2),
-  new THREE.MeshBasicMaterial({
-    wireframe: true,
-    color: 0xFFEA00
-  })
-);
-const objects = [];
-window.addEventListener('mousedown', function(){
-  const objectExist = objects.find(function(object ){
-    return (object.position.x === highlightMesh.position.x)
-    && (object.position.z === highlightMesh.position.z)
-  });
-
-  if(!objectExist){
-  intersects = raycaster.intersectObjects(scene.children);
-  intersects.forEach(function(intersect) {
-    if (intersect.object.name === 'ground') {
-      const sphereClone = sphereMesh.clone();
-      sphereClone.position.copy(highlightMesh.position);
-      scene.add(sphereClone);
-      objects.push(sphereClone);
-      highlightMesh.material.color.setHex(0xFF0000);
-    }
-  });
- }
+}, undefined, function (error) {
+    console.error(error);
 });
 
 // RENDER
 function animate(time) {
   requestAnimationFrame(animate);
-  highlightMesh.material.opacity = 1 + Math.sin(time/120);
-  objects.forEach(function(object){
-    object.rotation.x = time/1000;
-    object.rotation.z = time/1000;
-    object.position.y = 0.5 + 0.5 * Math.abs(Math.sin(time/1000));
-  });
-
   renderer.render(scene, camera);
 }
 animate();
